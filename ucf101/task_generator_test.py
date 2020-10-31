@@ -46,7 +46,9 @@ def ucf101_folders():
 class Ucf101Task(object):
 
     def __init__(self, character_folders, num_classes, train_num,test_num):
-
+        # print(num_classes)5
+        # print(train_num)1
+        # print(test_num)15
         self.character_folders = character_folders
         self.num_classes = num_classes
         self.train_num = train_num
@@ -56,27 +58,43 @@ class Ucf101Task(object):
         labels = np.array(range(len(class_folders)))
         labels = dict(zip(class_folders, labels))
         samples = dict()
-        class_ucf_folders=[]
+        class_ucf_support_folders = []
+        class_ucf_query_folders = []
+        self.train_roots=[]
+        self.test_roots=[]
+        self.train_labels=[]
+        self.test_labels=[]
+        # print(num_classes)5
+        # print(train_num)1
+        # print(test_num)15
+        for c in class_folders:
+            #c apply
+            filelist = os.listdir(c)
+            #file list apply/fefew/
+            train_file=random.sample(filelist,train_num)
+            for d in train_file:
+                class_ucf_support_folders.append(os.path.join(c,d))
+            #从每类一堆视频中选一个视频 一共选出了五个文件 5way 1shot
+
         for c in class_folders:
             filelist = os.listdir(c)
-            trainlist=random.sample(filelist,train_num)
-            for trainframe in trainlist:
-                class_ucf_folders.append(os.path.join(c,trainframe))
-        self.train_roots = []
-        self.test_roots = []
-        for c in class_ucf_folders:
+            filelist=random.sample(filelist, test_num)
+            for filefolder in filelist :
+                class_ucf_query_folders.append(os.path.join(c, filefolder))
 
+            # 从每类一堆视频中选3个视频 一共选出了15个文件 5way 1shot
+        for c in class_ucf_support_folders:
             temp = [os.path.join(c, x) for x in os.listdir(c)]
-            samples[c] = random.sample(temp, len(temp))
-            random.shuffle(samples[c])
-            print(train_num)
-            print("***************************")
-            print(test_num)
-            self.train_roots += samples[c][:1]
-            self.test_roots += samples[c][1:1+test_num]
+            samples=temp[len(temp)//2]
+            #取中间的帧作为输入
+            self.train_labels.append(labels[self.get_class(samples)])
+            self.train_roots.append(samples)
 
-        self.train_labels = [labels[self.get_class(x)] for x in self.train_roots]
-        self.test_labels = [labels[self.get_class(x)] for x in self.test_roots]
+        for c in class_ucf_query_folders:
+            temp = [os.path.join(c, x) for x in os.listdir(c)]
+            samples = temp[len(temp) // 2]
+            self.test_labels.append(labels[self.get_class(samples)])
+            self.test_roots.append(samples)
 
     def get_class(self, sample):
         return os.path.join(*sample.split('/')[:-2])
@@ -105,8 +123,9 @@ class Ucf101(FewShotDataset):
     def __getitem__(self, idx):
         image_root = self.image_roots[idx]
         image = Image.open(image_root)
-        image = image.resize((84, 84), resample=Image.LANCZOS)
+        # image = image.resize((84, 84), resample=Image.LANCZOS)
         image = image.convert('RGB')
+
         if self.transform is not None:
             image = self.transform(image)
         label = self.labels[idx]

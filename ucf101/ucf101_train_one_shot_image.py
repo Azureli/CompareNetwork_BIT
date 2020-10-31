@@ -21,7 +21,6 @@ import scipy.stats
 
 
 import datetime
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 parser = argparse.ArgumentParser(description="One Shot Visual Recognition")
 parser.add_argument("-f","--feature_dim",type = int, default = 64)
 parser.add_argument("-r","--relation_dim",type = int, default = 8)
@@ -138,8 +137,6 @@ def main():
 
     feature_encoder = CNNEncoder()
     relation_network = RelationNetwork(FEATURE_DIM,RELATION_DIM)
-    feature_encoder = nn.DataParallel(feature_encoder)
-    relation_network = nn.DataParallel(relation_network)
 
     feature_encoder.apply(weights_init)
     relation_network.apply(weights_init)
@@ -152,11 +149,11 @@ def main():
     relation_network_optim = torch.optim.Adam(relation_network.parameters(),lr=LEARNING_RATE)
     relation_network_scheduler = StepLR(relation_network_optim,step_size=100000,gamma=0.5)
 
-    if os.path.exists(str("./models/1020_ucf_feature_encoder_" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")):
-        feature_encoder.load_state_dict(torch.load(str("./models/1020_ucf_feature_encoder_" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")))
+    if os.path.exists(str("./models/1025_ucf_feature_encoder_" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")):
+        feature_encoder.load_state_dict(torch.load(str("./models/1025_ucf_feature_encoder_" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")))
         print("load feature encoder success")
-    if os.path.exists(str("./models/1020_ucf_relation_network_"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")):
-        relation_network.load_state_dict(torch.load(str("./models/1020_ucf_relation_network_"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")))
+    if os.path.exists(str("./models/1025_ucf_relation_network_"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")):
+        relation_network.load_state_dict(torch.load(str("./models/1025_ucf_relation_network_"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")))
         print("load relation network success")
 
     # Step 3: build graph
@@ -179,19 +176,15 @@ def main():
             # sample_dataloader is to obtain previous samples for compare
             # batch_dataloader is to batch samples for training
             task = tg.Ucf101Task(metatrain_folders,CLASS_NUM,SAMPLE_NUM_PER_CLASS,BATCH_NUM_PER_CLASS)
-
+            #class num=5
             sample_dataloader = tg.get_ucf101_data_loader(task,num_per_class=SAMPLE_NUM_PER_CLASS,split="train",shuffle=False)
             batch_dataloader = tg.get_ucf101_data_loader(task,num_per_class=BATCH_NUM_PER_CLASS,split="test",shuffle=True)
 
             # sample datas
             samples,sample_labels = sample_dataloader.__iter__().next()
             batches,batch_labels = batch_dataloader.__iter__().next()
-
-            # calculate features
             sample_features = feature_encoder(Variable(samples).cuda(GPU))
-            #torch.Size([5, 64, 19, 19])
             batch_features = feature_encoder(Variable(batches).cuda(GPU))
-            #75 64 19 19
             # calculate relations
             # each batch sample link to every samples to calculate relations
             # to form a 100x128 matrix for relation network
@@ -229,8 +222,7 @@ def main():
                 newcontext = "episode:    " + str(episode + 1) + "  loss    " + str(loss.item()) + '\n'
                 f.writelines(newcontext)
 
-            if episode%5000 == 0:
-
+            if episode%500 == 0:
                 # test
                 print("Testing...")
                 accuracies = []
@@ -239,7 +231,6 @@ def main():
                     counter = 0
                     task = tg.Ucf101Task(metatest_folders,CLASS_NUM,1,15)
                     sample_dataloader = tg.get_ucf101_data_loader(task,num_per_class=1,split="train",shuffle=False)
-
                     num_per_class = 3
                     test_dataloader = tg.get_ucf101_data_loader(task,num_per_class=num_per_class,split="test",shuffle=True)
                     sample_images,sample_labels = sample_dataloader.__iter__().next()
@@ -270,12 +261,14 @@ def main():
                 test_accuracy,h = mean_confidence_interval(accuracies)
 
                 print("test accuracy:",test_accuracy,"h:",h)
+                newcontext ="episode:    "+ str(episode + 1) +"test accuracy:    " + str(test_accuracy)+ '\n'
+                f.writelines(newcontext)
 
                 if test_accuracy > last_accuracy:
 
                     # save networks
-                    torch.save(feature_encoder.state_dict(),str("./models/1020_ucf_feature_encoder_" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl"))
-                    torch.save(relation_network.state_dict(),str("./models/1020_ucf_relation_network_"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl"))
+                    torch.save(feature_encoder.state_dict(),str("./models/1025_ucf_feature_encoder_" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl"))
+                    torch.save(relation_network.state_dict(),str("./models/1025_ucf_relation_network_"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl"))
 
                     print("save networks for episode:",episode)
 

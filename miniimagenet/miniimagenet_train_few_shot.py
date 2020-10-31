@@ -21,7 +21,7 @@ import scipy.stats
 
 
 import datetime
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2,3'
 parser = argparse.ArgumentParser(description="One Shot Visual Recognition")
 parser.add_argument("-f","--feature_dim",type = int, default = 64)
 parser.add_argument("-r","--relation_dim",type = int, default = 8)
@@ -275,6 +275,8 @@ def main():
                 test_accuracy,h = mean_confidence_interval(accuracies)
 
                 print("test accuracy:",test_accuracy,"h:",h)
+                newcontext = "episode:    " + str(episode + 1) + "test accuracy:    " + str(test_accuracy) + '\n'
+                f.writelines(newcontext)
 
                 if test_accuracy > last_accuracy:
 

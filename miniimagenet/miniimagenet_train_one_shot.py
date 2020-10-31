@@ -21,7 +21,6 @@ import scipy.stats
 
 
 import datetime
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 parser = argparse.ArgumentParser(description="One Shot Visual Recognition")
 parser.add_argument("-f","--feature_dim",type = int, default = 64)
 parser.add_argument("-r","--relation_dim",type = int, default = 8)
@@ -138,9 +137,6 @@ def main():
 
     feature_encoder = CNNEncoder()
     relation_network = RelationNetwork(FEATURE_DIM,RELATION_DIM)
-    feature_encoder = nn.DataParallel(feature_encoder)
-    relation_network = nn.DataParallel(relation_network)
-
     feature_encoder.apply(weights_init)
     relation_network.apply(weights_init)
 
@@ -186,12 +182,11 @@ def main():
             # sample datas
             samples,sample_labels = sample_dataloader.__iter__().next()
             batches,batch_labels = batch_dataloader.__iter__().next()
-
             # calculate features
             sample_features = feature_encoder(Variable(samples).cuda(GPU))
-            #torch.Size([5, 64, 19, 19])
+            # print(sample_features.shape)            torch.Size([5, 15, 64, 19, 19])
             batch_features = feature_encoder(Variable(batches).cuda(GPU))
-            #75 64 19 19
+            # print(batch_features.shape)  torch.Size([15, 5, 64, 19, 19])
             # calculate relations
             # each batch sample link to every samples to calculate relations
             # to form a 100x128 matrix for relation network
@@ -270,6 +265,8 @@ def main():
                 test_accuracy,h = mean_confidence_interval(accuracies)
 
                 print("test accuracy:",test_accuracy,"h:",h)
+                newcontext = "episode:    " + str(episode + 1) + "test accuracy:    " + str(test_accuracy) + '\n'
+                f.writelines(newcontext)
 
                 if test_accuracy > last_accuracy:
 

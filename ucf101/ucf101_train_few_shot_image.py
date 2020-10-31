@@ -153,11 +153,11 @@ def main():
     relation_network_optim = torch.optim.Adam(relation_network.parameters(),lr=LEARNING_RATE)
     relation_network_scheduler = StepLR(relation_network_optim,step_size=100000,gamma=0.5)
 
-    if os.path.exists(str("./models/1020_ucf_feature_encoder_" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")):
-        feature_encoder.load_state_dict(torch.load(str("./models/1020_ucf_feature_encoder_" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")))
+    if os.path.exists(str("./models/1025_ucf_feature_encoder_" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")):
+        feature_encoder.load_state_dict(torch.load(str("./models/1025_ucf_feature_encoder_" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")))
         print("load feature encoder success")
-    if os.path.exists(str("./models/1020_ucf_relation_network_"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")):
-        relation_network.load_state_dict(torch.load(str("./models/1020_ucf_relation_network_"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")))
+    if os.path.exists(str("./models/1025_ucf_relation_network_"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")):
+        relation_network.load_state_dict(torch.load(str("./models/1025_ucf_relation_network_"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")))
         print("load relation network success")
 
     # Step 3: build graph
@@ -168,7 +168,7 @@ def main():
     year = datetime.datetime.now().year
     month = datetime.datetime.now().month
     day = datetime.datetime.now().day
-    filename = "ucf_train_oneshot_" + str(year) + '_' + str(month) + '_' + str(day) + ".txt"
+    filename = "ucf_train_fewshot_" + str(year) + '_' + str(month) + '_' + str(day) + ".txt"
     with open("models/" + filename, "w") as f:
 
         for episode in range(EPISODE):
@@ -227,7 +227,7 @@ def main():
                 newcontext = "episode:    " + str(episode + 1) + "  loss    " + str(loss.item()) + '\n'
                 f.writelines(newcontext)
 
-            if episode%5000 == 0:
+            if episode % 500 == 0:
 
                 # test
                 print("Testing...")
@@ -235,16 +235,17 @@ def main():
                 for i in range(TEST_EPISODE):
                     total_rewards = 0
                     counter = 0
-                    task = tg.Ucf101Task(metatest_folders,CLASS_NUM,1,15)
-                    sample_dataloader = tg.get_ucf101_data_loader(task,num_per_class=1,split="train",shuffle=False)
+                    task = tg.Ucf101Task(metatest_folders,CLASS_NUM,SAMPLE_NUM_PER_CLASS,15)
+                    sample_dataloader = tg.get_ucf101_data_loader(task,SAMPLE_NUM_PER_CLASS,split="train",shuffle=False)
 
-                    num_per_class = 3
+                    num_per_class = 5
                     test_dataloader = tg.get_ucf101_data_loader(task,num_per_class=num_per_class,split="test",shuffle=True)
                     sample_images,sample_labels = sample_dataloader.__iter__().next()
                     for test_images,test_labels in test_dataloader:
                         batch_size = test_labels.shape[0]
                         # calculate features
                         sample_features = feature_encoder(Variable(sample_images).cuda(GPU)) # 5x64
+                        # print()
                         sample_features = sample_features.view(CLASS_NUM,SAMPLE_NUM_PER_CLASS,FEATURE_DIM,19,19)
                         sample_features = torch.sum(sample_features,1).squeeze(1)
                         test_features = feature_encoder(Variable(test_images).cuda(GPU)) # 20x64
@@ -261,7 +262,7 @@ def main():
 
                         _,predict_labels = torch.max(relations.data,1)
 
-                        rewards = [1 if predict_labels[j]==test_labels[j] else 0 for j in range(batch_size)]
+                        rewards = [1 if predict_labels[j].cuda()==test_labels[j].cuda() else 0 for j in range(batch_size)]
 
                         total_rewards += np.sum(rewards)
 
@@ -273,12 +274,14 @@ def main():
                 test_accuracy,h = mean_confidence_interval(accuracies)
 
                 print("test accuracy:",test_accuracy,"h:",h)
+                newcontext ="episode:    "+ str(episode + 1) +"test accuracy:    " + str(test_accuracy)+ '\n'
+                f.writelines(newcontext)
 
                 if test_accuracy > last_accuracy:
 
                     # save networks
-                    torch.save(feature_encoder.state_dict(),str("./models/1020_ucf_feature_encoder_" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl"))
-                    torch.save(relation_network.state_dict(),str("./models/1020_ucf_relation_encoder_"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl"))
+                    torch.save(feature_encoder.state_dict(),str("./models/1025_ucf_feature_encoder_" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl"))
+                    torch.save(relation_network.state_dict(),str("./models/1025_ucf_relation_network_"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl"))
 
                     print("save networks for episode:",episode)
 

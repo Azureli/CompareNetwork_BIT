@@ -11,6 +11,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from torch.utils.data.sampler import Sampler
 
+
+############one shot
 def imshow(img):
     npimg = img.numpy()
     plt.axis("off")
@@ -52,26 +54,45 @@ class Ucf101Task(object):
         self.train_num = train_num
         self.test_num = test_num
         class_folders = random.sample(self.character_folders,self.num_classes)
+        #五个类别文件夹
         labels = np.array(range(len(class_folders)))
         labels = dict(zip(class_folders, labels))
         samples = dict()
-        class_ucf_folders=[]
+        class_ucf_support_folders = []
+        class_ucf_query_folders = []
+        self.train_roots=[]
+        self.test_roots=[]
+        self.train_labels=[]
+        self.test_labels=[]
+        # print(num_classes)5
+        # print(train_num)1
+        # print(test_num)15
+        for c in class_folders:
+            #c apply
+            filelist = os.listdir(c)
+            #file list apply/fefew/
+            class_ucf_support_folders.append(os.path.join(c,random.sample(filelist,train_num)[0]))
+
+            #从每类一堆视频中选一个视频 一共选出了五个文件 5way 1shot
         for c in class_folders:
             filelist = os.listdir(c)
-            class_ucf_folders.append(os.path.join(c,random.sample(filelist,1)[0]))
-            #从每类一堆视频中选一个视频 一共选出了五个文件
-        # print(class_ucf_folders)
-        self.train_roots = []
-        self.test_roots = []
-        for c in class_ucf_folders:
-            temp = [os.path.join(c, x) for x in os.listdir(c)]
-            samples[c] = random.sample(temp, len(temp))
-            random.shuffle(samples[c])
-            self.train_roots += samples[c][:train_num]
-            self.test_roots += samples[c][train_num:train_num+test_num]
+            filelist=random.sample(filelist, test_num)
+            for filefolder in filelist :
+                class_ucf_query_folders.append(os.path.join(c, filefolder))
 
-        self.train_labels = [labels[self.get_class(x)] for x in self.train_roots]
-        self.test_labels = [labels[self.get_class(x)] for x in self.test_roots]
+            # 从每类一堆视频中选3个视频 一共选出了15个文件 5way 1shot
+        for c in class_ucf_support_folders:
+            temp = [os.path.join(c, x) for x in os.listdir(c)]
+            samples=temp[len(temp)//2]
+            #取中间的帧作为输入
+            self.train_labels.append(labels[self.get_class(samples)])
+            self.train_roots.append(samples)
+
+        for c in class_ucf_query_folders:
+            temp = [os.path.join(c, x) for x in os.listdir(c)]
+            samples = temp[len(temp) // 2]
+            self.test_labels.append(labels[self.get_class(samples)])
+            self.test_roots.append(samples)
 
     def get_class(self, sample):
         return os.path.join(*sample.split('/')[:-2])
@@ -101,7 +122,7 @@ class Ucf101(FewShotDataset):
     def __getitem__(self, idx):
         image_root = self.image_roots[idx]
         image = Image.open(image_root)
-        image = image.resize((84, 84), resample=Image.LANCZOS)
+        # image = image.resize((84, 84), resample=Image.LANCZOS)
         image = image.convert('RGB')
         if self.transform is not None:
             image = self.transform(image)
@@ -139,7 +160,6 @@ class ClassBalancedSampler(Sampler):
 
 def get_ucf101_data_loader(task, num_per_class=1, split='train',shuffle = False):
     normalize = transforms.Normalize(mean=[0.92206, 0.92206, 0.92206], std=[0.08426, 0.08426, 0.08426])
-
     dataset = Ucf101(task,split=split,transform=transforms.Compose([transforms.ToTensor(),normalize]))
 
     if split == 'train':
