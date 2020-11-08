@@ -33,6 +33,7 @@ parser.add_argument("-l","--learning_rate", type = float, default = 0.001)
 parser.add_argument("-g","--gpu",type=int, default=0)
 parser.add_argument("-u","--hidden_unit",type=int,default=10)
 args = parser.parse_args()
+os.environ['CUDA_VISIBLE_DEVICES'] = '4'
 
 
 # Hyper Parameters
@@ -137,6 +138,8 @@ def main():
 
     feature_encoder = CNNEncoder()
     relation_network = RelationNetwork(FEATURE_DIM,RELATION_DIM)
+    feature_encoder = nn.DataParallel(feature_encoder)
+    relation_network = nn.DataParallel(relation_network)
     feature_encoder.apply(weights_init)
     relation_network.apply(weights_init)
 
@@ -148,11 +151,11 @@ def main():
     relation_network_optim = torch.optim.Adam(relation_network.parameters(),lr=LEARNING_RATE)
     relation_network_scheduler = StepLR(relation_network_optim,step_size=100000,gamma=0.5)
 
-    if os.path.exists(str("./models/miniimagenet_feature_encoder_" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")):
-        feature_encoder.load_state_dict(torch.load(str("./models/miniimagenet_feature_encoder_" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")))
+    if os.path.exists(str("./models/miniimagenet_feature_encoder2" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")):
+        feature_encoder.load_state_dict(torch.load(str("./models/miniimagenet_feature_encoder2" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")))
         print("load feature encoder success")
-    if os.path.exists(str("./models/miniimagenet_relation_network_"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")):
-        relation_network.load_state_dict(torch.load(str("./models/miniimagenet_relation_network_"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")))
+    if os.path.exists(str("./models/miniimagenet_relation_network2"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")):
+        relation_network.load_state_dict(torch.load(str("./models/miniimagenet_relation_network2"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")))
         print("load relation network success")
 
     # Step 3: build graph
@@ -271,8 +274,8 @@ def main():
                 if test_accuracy > last_accuracy:
 
                     # save networks
-                    torch.save(feature_encoder.state_dict(),str("./models/miniimagenet_feature_encoder_" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl"))
-                    torch.save(relation_network.state_dict(),str("./models/miniimagenet_relation_network_"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl"))
+                    torch.save(feature_encoder.state_dict(),str("./models/miniimagenet_feature_encoder2" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl"))
+                    torch.save(relation_network.state_dict(),str("./models/miniimagenet_relation_network2"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl"))
 
                     print("save networks for episode:",episode)
 

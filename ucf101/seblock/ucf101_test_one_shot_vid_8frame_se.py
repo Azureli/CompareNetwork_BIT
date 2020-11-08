@@ -1,30 +1,21 @@
-#-------------------------------------
-# Project: Learning to Compare: Relation Network for Few-Shot Learning
-# Date: 2017.9.21
-# Author: Flood Sung
-# All Rights Reserved
-#-------------------------------------
-
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 from torch.optim.lr_scheduler import StepLR
 import numpy as np
-import task_generator_test_vid as tg
+import task_generator_test_vid_8frame as tg
 import os
 import math
 import argparse
 import scipy as sp
 import scipy.stats
-import datetime
-
+import matplotlib.pyplot as plt
 parser = argparse.ArgumentParser(description="One Shot Visual Recognition")
 parser.add_argument("-f","--feature_dim",type = int, default = 64)
 parser.add_argument("-r","--relation_dim",type = int, default = 8)
 parser.add_argument("-w","--class_num",type = int, default = 5)
-parser.add_argument("-s","--sample_num_per_class",type = int, default = 5)
+parser.add_argument("-s","--sample_num_per_class",type = int, default = 1)
 parser.add_argument("-b","--batch_num_per_class",type = int, default = 10)
 parser.add_argument("-e","--episode",type = int, default= 10)
 parser.add_argument("-t","--test_episode", type = int, default = 600)
@@ -32,15 +23,13 @@ parser.add_argument("-l","--learning_rate", type = float, default = 0.001)
 parser.add_argument("-g","--gpu",type=int, default=0)
 parser.add_argument("-u","--hidden_unit",type=int,default=10)
 args = parser.parse_args()
-
 os.environ['CUDA_VISIBLE_DEVICES'] = '4,5,6,7'
-
 
 # Hyper Parameters
 FEATURE_DIM = args.feature_dim
 RELATION_DIM = args.relation_dim
 CLASS_NUM = args.class_num
-SAMPLE_NUM_PER_CLASS = args.sample_num_per_class
+SAMPLE_NUM_PER_CLASS = 1
 BATCH_NUM_PER_CLASS = args.batch_num_per_class
 EPISODE = args.episode
 TEST_EPISODE = args.test_episode
@@ -54,6 +43,25 @@ def mean_confidence_interval(data, confidence=0.95):
     m, se = np.mean(a), scipy.stats.sem(a)
     h = se * sp.stats.t._ppf((1+confidence)/2., n-1)
     return m,h
+
+
+class SELayer(nn.Module):
+    def __init__(self, channel, reduction=16):
+        super(SELayer, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Sequential(
+            nn.Linear(channel, channel // reduction, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Linear(channel // reduction, channel, bias=False),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        b, c, _, _, _ = x.size()
+        #batch c 1 h w
+        y = self.avg_pool(x).view(b, c)
+        y = self.fc(y).view(b, c, 1, 1, 1)
+        return x * y.expand_as(x)
 
 class CNNEncoder(nn.Module):
     #C3d
@@ -78,6 +86,8 @@ class CNNEncoder(nn.Module):
                         nn.Conv3d(64,64,kernel_size=3,padding=1),
                         nn.BatchNorm3d(64, momentum=1, affine=True),
                         nn.ReLU())
+        self.se = SELayer(64, 16)
+
 
     def forward(self,x):
         x=x.transpose(1,2)
@@ -93,10 +103,8 @@ class CNNEncoder(nn.Module):
         # print("after layer 3")
         # print(out.shape)
         out = self.layer4(out)
-        # print("after layer 4")
-        # print(out.shape)
-        #out = out.view(out.size(0),-1)
-        return out # 64
+        out = self.se(out)
+        return out
 
 class RelationNetwork(nn.Module):
     """docstring for RelationNetwork"""
@@ -136,7 +144,9 @@ def weights_init(m):
     elif classname.find('Linear') != -1:
         n = m.weight.size(1)
         m.weight.data.normal_(0, 0.01)
-        m.bias.data = torch.ones(m.bias.data.size())
+        if m.bias is not None:
+            m.bias.data = torch.ones(m.bias.data.size())
+
 
 def main():
     # Step 1: init data folders
@@ -156,21 +166,18 @@ def main():
     feature_encoder.cuda(GPU)
     relation_network.cuda(GPU)
 
-    feature_encoder_optim = torch.optim.Adam(feature_encoder.parameters(),lr=LEARNING_RATE)
-    feature_encoder_scheduler = StepLR(feature_encoder_optim,step_size=100000,gamma=0.5)
-    relation_network_optim = torch.optim.Adam(relation_network.parameters(),lr=LEARNING_RATE)
-    relation_network_scheduler = StepLR(relation_network_optim,step_size=100000,gamma=0.5)
 
-    if os.path.exists(str("./models/ucf_feature_encoder_c3d_16frame" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")):
-        feature_encoder.load_state_dict(torch.load(str("./models/ucf_feature_encoder_c3d_16frame" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")))
+    if os.path.exists(str("../models/ucf_feature_encoder_c3d_8frame_seblock" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")):
+        feature_encoder.load_state_dict(torch.load(str("../models/ucf_feature_encoder_c3d_8frame_seblock" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")))
         print("load feature encoder success")
-    if os.path.exists(str("./models/ucf_relation_network_c3d_16frame"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")):
-        relation_network.load_state_dict(torch.load(str("./models/ucf_relation_network_c3d_16frame"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")))
+    if os.path.exists(str("../models/ucf_relation_network_c3d_8frame_seblock"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")):
+        relation_network.load_state_dict(torch.load(str("../models/ucf_relation_network_c3d_8frame_seblock"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")))
         print("load relation network success")
+
+    # Step 3: build graph
 
     total_accuracy = 0.0
     for episode in range(EPISODE):
-
 
             # test
             print("Testing...")
@@ -178,18 +185,25 @@ def main():
             accuracies = []
             for i in range(TEST_EPISODE):
                 total_rewards = 0
-                task = tg.Ucf101Task(metatest_folders,CLASS_NUM,SAMPLE_NUM_PER_CLASS,15)
-                sample_dataloader = tg.get_ucf101_data_loader(task,num_per_class=SAMPLE_NUM_PER_CLASS,split="train",shuffle=False)
-                num_per_class = 5
-                test_dataloader = tg.get_ucf101_data_loader(task,num_per_class=num_per_class,split="test",shuffle=False)
+                counter = 0
+                task = tg.Ucf101Task(metatest_folders,CLASS_NUM,1,15)
+                sample_dataloader = tg.get_ucf101_data_loader(task,num_per_class=1,split="train",shuffle=False)
 
+                num_per_class = 3
+                test_dataloader = tg.get_ucf101_data_loader(task,num_per_class=num_per_class,split="test",shuffle=True)
                 sample_images,sample_labels = sample_dataloader.__iter__().next()
                 for test_images,test_labels in test_dataloader:
+
+                    # imgshow=test_images[0]
+                    # imgshow = imgshow.numpy()  # FloatTensor转为ndarray
+                    # imgshow = 0.08426 * imgshow + 0.92206
+                    # imgshow = imgshow.transpose((1, 2, 0)) #
+                    # plt.imshow(imgshow)
+                    # plt.show()
+
                     batch_size = test_labels.shape[0]
                     # calculate features
                     sample_features = feature_encoder(Variable(sample_images).cuda(GPU)) # 5x64
-                    sample_features = sample_features.view(CLASS_NUM,SAMPLE_NUM_PER_CLASS,FEATURE_DIM,19,19)
-                    sample_features = torch.sum(sample_features,1).squeeze(1)
                     test_features = feature_encoder(Variable(test_images).cuda(GPU)) # 20x64
 
                     # calculate relations
@@ -208,9 +222,8 @@ def main():
                     rewards = [1 if predict_labels[j].cuda()==test_labels[j].cuda() else 0 for j in range(batch_size)]
 
                     total_rewards += np.sum(rewards)
-
-
-                accuracy = total_rewards/1.0/CLASS_NUM/15
+                    counter += batch_size
+                accuracy = total_rewards/1.0/counter
                 accuracies.append(accuracy)
 
             test_accuracy,h = mean_confidence_interval(accuracies)
@@ -220,7 +233,6 @@ def main():
             total_accuracy += test_accuracy
 
     print("aver_accuracy:",total_accuracy/EPISODE)
-
 
 
 

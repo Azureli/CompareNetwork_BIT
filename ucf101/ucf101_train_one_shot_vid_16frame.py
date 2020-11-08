@@ -19,13 +19,13 @@ parser.add_argument("-r","--relation_dim",type = int, default = 8)
 parser.add_argument("-w","--class_num",type = int, default = 5)
 parser.add_argument("-s","--sample_num_per_class",type = int, default = 1)
 parser.add_argument("-b","--batch_num_per_class",type = int, default = 15)
-parser.add_argument("-e","--episode",type = int, default=500000)
+parser.add_argument("-e","--episode",type = int, default=100000)
 parser.add_argument("-t","--test_episode", type = int, default = 600)
 parser.add_argument("-l","--learning_rate", type = float, default = 0.001)
 parser.add_argument("-g","--gpu",type=int, default=0)
 parser.add_argument("-u","--hidden_unit",type=int,default=10)
 args = parser.parse_args()
-os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2,3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '4,5,6,7'
 
 # Hyper Parameters
 FEATURE_DIM = args.feature_dim
@@ -52,24 +52,25 @@ class CNNEncoder(nn.Module):
     def __init__(self):
         super(CNNEncoder, self).__init__()
         self.layer1 = nn.Sequential(
-                        nn.Conv3d(3,64,kernel_size=3,padding=0),
+                        nn.Conv3d(3,64,kernel_size=3,padding=1),
                         nn.BatchNorm3d(64, momentum=1, affine=True),
                         nn.ReLU(),
-                        nn.MaxPool3d(kernel_size=(2, 2, 2), stride=(2, 2, 2)))
+                        nn.MaxPool3d(kernel_size=(2, 2, 2), stride=(2, 2, 2))
+        )
         self.layer2 = nn.Sequential(
-                        nn.Conv3d(64,64,kernel_size=3,padding=0),
+                        nn.Conv3d(64,64,kernel_size=3,padding=1),
                         nn.BatchNorm3d(64, momentum=1, affine=True),
                         nn.ReLU(),
                         nn.MaxPool3d(kernel_size=(2, 2, 2), stride=(2, 2, 2)))
         self.layer3 = nn.Sequential(
-                        nn.Conv3d(64,64,kernel_size=3,padding=1),
+                        nn.Conv3d(64,64,kernel_size=3,padding=0),
                         nn.BatchNorm3d(64, momentum=1, affine=True),
-                        nn.ReLU(),)
+                        nn.ReLU(),
+                        nn.MaxPool3d(kernel_size=(2, 1, 1), stride=(2, 1, 1)))
         self.layer4 = nn.Sequential(
                         nn.Conv3d(64,64,kernel_size=3,padding=1),
                         nn.BatchNorm3d(64, momentum=1, affine=True),
                         nn.ReLU())
-
 
     def forward(self,x):
         x=x.transpose(1,2)
@@ -85,8 +86,8 @@ class CNNEncoder(nn.Module):
         # print("after layer 3")
         # print(out.shape)
         out = self.layer4(out)
-        # print("after layer 4")
-        # print(out.shape)
+        # print("afterape) layer 4")
+        #         # print(out.sh
         #out = out.view(out.size(0),-1)
         return out # 64
 
@@ -114,9 +115,6 @@ class RelationNetwork(nn.Module):
         out = F.relu(self.fc1(out))
         out = F.sigmoid(self.fc2(out))
         return out
-
-
-
 
 def weights_init(m):
     classname = m.__class__.__name__
@@ -159,11 +157,11 @@ def main():
     relation_network_optim = torch.optim.Adam(relation_network.parameters(),lr=LEARNING_RATE)
     relation_network_scheduler = StepLR(relation_network_optim,step_size=100000,gamma=0.5)
 
-    if os.path.exists(str("./models/ucf_feature_encoder_c3d_8frame_2" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")):
-        feature_encoder.load_state_dict(torch.load(str("./models/ucf_feature_encoder_c3d_8frame_2" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")))
+    if os.path.exists(str("./models/ucf_feature_encoder_c3d_16frame" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")):
+        feature_encoder.load_state_dict(torch.load(str("./models/ucf_feature_encoder_c3d_16frame" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")))
         print("load feature encoder success")
-    if os.path.exists(str("./models/ucf_relation_network_c3d_8frame_2"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")):
-        relation_network.load_state_dict(torch.load(str("./models/ucf_relation_network_c3d_8frame_2"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")))
+    if os.path.exists(str("./models/ucf_relation_network_c3d_16frame"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")):
+        relation_network.load_state_dict(torch.load(str("./models/ucf_relation_network_c3d_16frame"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")))
         print("load relation network success")
 
     # Step 3: build graph
@@ -174,7 +172,7 @@ def main():
     year = datetime.datetime.now().year
     month = datetime.datetime.now().month
     day = datetime.datetime.now().day
-    filename = "ucf_train_oneshot_c3d_8frame_" + str(year) + '_' + str(month) + '_' + str(day) + ".txt"
+    filename = "ucf_train_oneshot_c3d_16frame_" + str(year) + '_' + str(month) + '_' + str(day) + ".txt"
     with open("models/" + filename, "w") as f:
 
         for episode in range(EPISODE):
@@ -281,8 +279,8 @@ def main():
                 if test_accuracy > last_accuracy:
 
                     # save networks
-                    torch.save(feature_encoder.state_dict(),str("./models/ucf_feature_encoder_c3d_8frame_2" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl"))
-                    torch.save(relation_network.state_dict(),str("./models/ucf_relation_network_c3d_8frame_2"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl"))
+                    torch.save(feature_encoder.state_dict(),str("./models/ucf_feature_encoder_c3d_16frame" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl"))
+                    torch.save(relation_network.state_dict(),str("./models/ucf_relation_network_c3d_16frame"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl"))
 
                     print("save networks for episode:",episode)
 

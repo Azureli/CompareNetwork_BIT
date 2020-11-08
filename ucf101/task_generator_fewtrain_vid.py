@@ -26,7 +26,7 @@ class Rotate(object):
 
 def ucf101_folders():
     train_folder = '../datas/ucf_data/trainsplit1'
-    test_folder = '../datas/ucf_data/testsplit1'
+    test_folder = '../datas/ucf_data/valsplit1'
 
     metatrain_folders = [os.path.join(train_folder, label) \
                 for label in os.listdir(train_folder) \

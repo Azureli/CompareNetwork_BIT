@@ -61,19 +61,21 @@ class CNNEncoder(nn.Module):
     def __init__(self):
         super(CNNEncoder, self).__init__()
         self.layer1 = nn.Sequential(
-                        nn.Conv3d(3,64,kernel_size=3,padding=0),
+                        nn.Conv3d(3,64,kernel_size=3,padding=1),
                         nn.BatchNorm3d(64, momentum=1, affine=True),
                         nn.ReLU(),
-                        nn.MaxPool3d(kernel_size=(2, 2, 2), stride=(2, 2, 2)))
+                        nn.MaxPool3d(kernel_size=(2, 2, 2), stride=(2, 2, 2))
+        )
         self.layer2 = nn.Sequential(
-                        nn.Conv3d(64,64,kernel_size=3,padding=0),
+                        nn.Conv3d(64,64,kernel_size=3,padding=1),
                         nn.BatchNorm3d(64, momentum=1, affine=True),
                         nn.ReLU(),
                         nn.MaxPool3d(kernel_size=(2, 2, 2), stride=(2, 2, 2)))
         self.layer3 = nn.Sequential(
-                        nn.Conv3d(64,64,kernel_size=3,padding=1),
+                        nn.Conv3d(64,64,kernel_size=3,padding=0),
                         nn.BatchNorm3d(64, momentum=1, affine=True),
-                        nn.ReLU(),)
+                        nn.ReLU(),
+                        nn.MaxPool3d(kernel_size=(2, 1, 1), stride=(2, 1, 1)))
         self.layer4 = nn.Sequential(
                         nn.Conv3d(64,64,kernel_size=3,padding=1),
                         nn.BatchNorm3d(64, momentum=1, affine=True),
@@ -93,8 +95,8 @@ class CNNEncoder(nn.Module):
         # print("after layer 3")
         # print(out.shape)
         out = self.layer4(out)
-        # print("after layer 4")
-        # print(out.shape)
+        # print("afterape) layer 4")
+        #         # print(out.sh
         #out = out.view(out.size(0),-1)
         return out # 64
 

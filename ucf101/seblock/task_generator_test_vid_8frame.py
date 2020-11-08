@@ -25,8 +25,8 @@ class Rotate(object):
         return x
 
 def ucf101_folders():
-    train_folder = '../datas/ucf_data/trainsplit1'
-    test_folder = '../datas/ucf_data/testsplit1'
+    train_folder = '../../datas/ucf_data/trainsplit1'
+    test_folder = '../../datas/ucf_data/testsplit1'
 
     metatrain_folders = [os.path.join(train_folder, label) \
                 for label in os.listdir(train_folder) \
@@ -83,16 +83,16 @@ class Ucf101Task(object):
         for c in class_ucf_support_folders:
             temp = [os.path.join(c, x) for x in os.listdir(c)]
             temp.sort()
-            samples=temp[0:len(temp):len(temp)//16]
-            samples=samples[:16]
+            samples=temp[0:len(temp):len(temp)//8]
+            samples=samples[:8]
             #取中间的帧作为输入
             self.train_labels.append(labels[self.get_class(samples[0])])
             self.train_roots.append(samples)
 
         for c in class_ucf_query_folders:
             temp = [os.path.join(c, x) for x in os.listdir(c)]
-            samples=temp[1:len(temp):len(temp)//16]
-            samples = samples[:16]
+            samples=temp[1:len(temp):len(temp)//8]
+            samples = samples[:8]
             self.test_labels.append(labels[self.get_class(samples[0])])
             self.test_roots.append(samples)
 

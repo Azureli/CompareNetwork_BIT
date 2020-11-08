@@ -6,7 +6,7 @@ import os
 
 from PIL import Image
 #/data/UCF-101/
-path_to_images = '../ucf_data/testsplit1/'
+path_to_images = '../ucf_data/testsplit1_128/'
 
 all_file = glob.glob(path_to_images + '*'+'/'+'*')
 
@@ -19,7 +19,7 @@ for i, image_file in enumerate(all_file):
     temp = [os.path.join(image_file,x) for x in os.listdir(image_file)]
     for sample in temp:
         im = Image.open(sample)
-        im = im.resize((84, 84), resample=Image.LANCZOS)
+        im = im.resize((128, 128), resample=Image.LANCZOS)
         im.save(sample)
     finish_word=image_file+" is finished..."
     print(finish_word)

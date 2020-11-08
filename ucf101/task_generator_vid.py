@@ -84,16 +84,16 @@ class Ucf101Task(object):
         for c in class_ucf_support_folders:
             temp = [os.path.join(c, x) for x in os.listdir(c)]
             temp.sort()
-            samples=temp[0:len(temp):len(temp)//8]
-            samples=samples[:8]
+            samples=temp[0:len(temp):len(temp)//16]
+            samples=samples[:16]
             #取中间的帧作为输入
             self.train_labels.append(labels[self.get_class(samples[0])])
             self.train_roots.append(samples)
 
         for c in class_ucf_query_folders:
             temp = [os.path.join(c, x) for x in os.listdir(c)]
-            samples=temp[1:len(temp):len(temp)//8]
-            samples = samples[:8]
+            samples=temp[1:len(temp):len(temp)//16]
+            samples = samples[:16]
             self.test_labels.append(labels[self.get_class(samples[0])])
             self.test_roots.append(samples)
 
