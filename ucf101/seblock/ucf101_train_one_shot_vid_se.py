@@ -62,6 +62,7 @@ class SELayer(nn.Module):
         y = self.avg_pool(x).view(b, c)
         y = self.fc(y).view(b, c, 1, 1, 1)
         return x * y.expand_as(x)
+
 class CNNEncoder(nn.Module):
     #C3d
     """docstring for ClassName"""
@@ -133,9 +134,6 @@ class RelationNetwork(nn.Module):
         out = F.sigmoid(self.fc2(out))
         return out
 
-
-
-
 def weights_init(m):
     classname = m.__class__.__name__
     if classname.find('Conv') != -1:
@@ -149,7 +147,8 @@ def weights_init(m):
     elif classname.find('Linear') != -1:
         n = m.weight.size(1)
         m.weight.data.normal_(0, 0.01)
-        m.bias.data = torch.ones(m.bias.data.size())
+        if m.bias is not None:
+            m.bias.data = torch.ones(m.bias.data.size())
 
 def main():
     # Step 1: init data folders

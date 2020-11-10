@@ -23,7 +23,7 @@ parser.add_argument("-l","--learning_rate", type = float, default = 0.001)
 parser.add_argument("-g","--gpu",type=int, default=0)
 parser.add_argument("-u","--hidden_unit",type=int,default=10)
 args = parser.parse_args()
-os.environ['CUDA_VISIBLE_DEVICES'] = '4,5,6,7'
+os.environ['CUDA_VISIBLE_DEVICES'] = '4'
 
 # Hyper Parameters
 FEATURE_DIM = args.feature_dim
@@ -44,6 +44,24 @@ def mean_confidence_interval(data, confidence=0.95):
     h = se * sp.stats.t._ppf((1+confidence)/2., n-1)
     return m,h
 
+
+class SELayer(nn.Module):
+    def __init__(self, channel, reduction=16):
+        super(SELayer, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Sequential(
+            nn.Linear(channel, channel // reduction, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Linear(channel // reduction, channel, bias=False),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        b, c, _, _, _ = x.size()
+        #batch c 1 h w
+        y = self.avg_pool(x).view(b, c)
+        y = self.fc(y).view(b, c, 1, 1, 1)
+        return x * y.expand_as(x)
 
 class CNNEncoder(nn.Module):
     #C3d
@@ -68,6 +86,8 @@ class CNNEncoder(nn.Module):
                         nn.Conv3d(64,64,kernel_size=3,padding=1),
                         nn.BatchNorm3d(64, momentum=1, affine=True),
                         nn.ReLU())
+        self.se = SELayer(64, 16)
+
 
     def forward(self,x):
         x=x.transpose(1,2)
@@ -83,6 +103,7 @@ class CNNEncoder(nn.Module):
         # print("after layer 3")
         # print(out.shape)
         out = self.layer4(out)
+        out = self.se(out)
         # print("after layer 4")
         # print(out.shape)
         #out = out.view(out.size(0),-1)
@@ -126,8 +147,8 @@ def weights_init(m):
     elif classname.find('Linear') != -1:
         n = m.weight.size(1)
         m.weight.data.normal_(0, 0.01)
-        m.bias.data = torch.ones(m.bias.data.size())
-
+        if m.bias is not None:
+            m.bias.data = torch.ones(m.bias.data.size())
 
 def main():
     # Step 1: init data folders
@@ -148,11 +169,11 @@ def main():
     relation_network.cuda(GPU)
 
 
-    if os.path.exists(str("./models/ucf_feature_encoder_c3d_4frame" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")):
-        feature_encoder.load_state_dict(torch.load(str("./models/ucf_feature_encoder_c3d_4frame" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")))
+    if os.path.exists(str("./model/ucf_feature_encoder_c3d_1frame_se" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")):
+        feature_encoder.load_state_dict(torch.load(str("./model/ucf_feature_encoder_c3d_1frame_se" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")))
         print("load feature encoder success")
-    if os.path.exists(str("./models/ucf_relation_network_c3d_4frame"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")):
-        relation_network.load_state_dict(torch.load(str("./models/ucf_relation_network_c3d_4frame"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")))
+    if os.path.exists(str("./model/ucf_relation_network_c3d_1frame_se"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")):
+        relation_network.load_state_dict(torch.load(str("./model/ucf_relation_network_c3d_1frame_se"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")))
         print("load relation network success")
 
     # Step 3: build graph

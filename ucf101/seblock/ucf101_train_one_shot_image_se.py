@@ -1,10 +1,18 @@
+#-------------------------------------
+# Project: Learning to Compare: Relation Network for Few-Shot Learning
+# Date: 2017.9.21
+# Author: Flood Sung
+# All Rights Reserved
+#-------------------------------------
+
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 from torch.optim.lr_scheduler import StepLR
 import numpy as np
-import task_generator_vid_16 as tg
+import task_generator as tg
 import os
 import math
 import argparse
@@ -25,7 +33,7 @@ parser.add_argument("-l","--learning_rate", type = float, default = 0.001)
 parser.add_argument("-g","--gpu",type=int, default=0)
 parser.add_argument("-u","--hidden_unit",type=int,default=10)
 args = parser.parse_args()
-os.environ['CUDA_VISIBLE_DEVICES'] = '6,7'
+os.environ['CUDA_VISIBLE_DEVICES'] = '4'
 
 # Hyper Parameters
 FEATURE_DIM = args.feature_dim
@@ -46,48 +54,53 @@ def mean_confidence_interval(data, confidence=0.95):
     h = se * sp.stats.t._ppf((1+confidence)/2., n-1)
     return m,h
 
+class SELayer(nn.Module):
+    def __init__(self, channel, reduction=16):
+        super(SELayer, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Sequential(
+            nn.Linear(channel, channel // reduction, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Linear(channel // reduction, channel, bias=False),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        b, c, _, _, _ = x.size()
+        #batch c 1 h w
+        y = self.avg_pool(x).view(b, c)
+        y = self.fc(y).view(b, c, 1, 1, 1)
+        return x * y.expand_as(x)
 class CNNEncoder(nn.Module):
-    #C3d
     """docstring for ClassName"""
     def __init__(self):
         super(CNNEncoder, self).__init__()
         self.layer1 = nn.Sequential(
-                        nn.Conv3d(3,64,kernel_size=3,padding=1),
-                        nn.BatchNorm3d(64, momentum=1, affine=True),
+                        nn.Conv2d(3,64,kernel_size=3,padding=0),
+                        nn.BatchNorm2d(64, momentum=1, affine=True),
                         nn.ReLU(),
-                        nn.MaxPool3d(kernel_size=(2, 2, 2), stride=(2, 2, 2))
-        )
+                        nn.MaxPool2d(2))
         self.layer2 = nn.Sequential(
-                        nn.Conv3d(64,64,kernel_size=3,padding=1),
-                        nn.BatchNorm3d(64, momentum=1, affine=True),
+                        nn.Conv2d(64,64,kernel_size=3,padding=0),
+                        nn.BatchNorm2d(64, momentum=1, affine=True),
                         nn.ReLU(),
-                        nn.MaxPool3d(kernel_size=(2, 2, 2), stride=(2, 2, 2)))
+                        nn.MaxPool2d(2))
         self.layer3 = nn.Sequential(
-                        nn.Conv3d(64,64,kernel_size=3,padding=0),
-                        nn.BatchNorm3d(64, momentum=1, affine=True),
-                        nn.ReLU(),
-                        nn.MaxPool3d(kernel_size=(2, 1, 1), stride=(2, 1, 1)))
-        self.layer4 = nn.Sequential(
-                        nn.Conv3d(64,64,kernel_size=3,padding=1),
-                        nn.BatchNorm3d(64, momentum=1, affine=True),
+                        nn.Conv2d(64,64,kernel_size=3,padding=1),
+                        nn.BatchNorm2d(64, momentum=1, affine=True),
                         nn.ReLU())
+        self.layer4 = nn.Sequential(
+                        nn.Conv2d(64,64,kernel_size=3,padding=1),
+                        nn.BatchNorm2d(64, momentum=1, affine=True),
+                        nn.ReLU())
+        self.se = self.se = SELayer(64, 16)
 
     def forward(self,x):
-        x=x.transpose(1,2)
-        # print("input")
-        # print(x.shape)
         out = self.layer1(x)
-        # print("after layer 1 ")
-        # print(out.shape)
         out = self.layer2(out)
-        # print("after layer 2")
-        # print(out.shape)
         out = self.layer3(out)
-        # print("after layer 3")
-        # print(out.shape)
         out = self.layer4(out)
-        # print("afterape) layer 4")
-        #         # print(out.sh
+        out = self.se(out)
         #out = out.view(out.size(0),-1)
         return out # 64
 
@@ -129,7 +142,8 @@ def weights_init(m):
     elif classname.find('Linear') != -1:
         n = m.weight.size(1)
         m.weight.data.normal_(0, 0.01)
-        m.bias.data = torch.ones(m.bias.data.size())
+        if m.bias is not None:
+            m.bias.data = torch.ones(m.bias.data.size())
 
 def main():
     # Step 1: init data folders
@@ -157,11 +171,11 @@ def main():
     relation_network_optim = torch.optim.Adam(relation_network.parameters(),lr=LEARNING_RATE)
     relation_network_scheduler = StepLR(relation_network_optim,step_size=100000,gamma=0.5)
 
-    if os.path.exists(str("./model/ucf_feature_encoder_c3d_16frame" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")):
-        feature_encoder.load_state_dict(torch.load(str("./model/ucf_feature_encoder_c3d_16frame" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")))
+    if os.path.exists(str("../model/ucf_feature_encoder_1frame_img_se" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")):
+        feature_encoder.load_state_dict(torch.load(str("../model/ucf_feature_encoder_1frame_img_se" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")))
         print("load feature encoder success")
-    if os.path.exists(str("./model/ucf_relation_network_c3d_16frame"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")):
-        relation_network.load_state_dict(torch.load(str("./model/ucf_relation_network_c3d_16frame"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")))
+    if os.path.exists(str("../model/ucf_relation_network_1frame_img_se"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")):
+        relation_network.load_state_dict(torch.load(str("../model/ucf_relation_network_1frame_img_se"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")))
         print("load relation network success")
 
     # Step 3: build graph
@@ -172,8 +186,8 @@ def main():
     year = datetime.datetime.now().year
     month = datetime.datetime.now().month
     day = datetime.datetime.now().day
-    filename = "ucf_train_oneshot_c3d_16frame_" + str(year) + '_' + str(month) + '_' + str(day) + ".txt"
-    with open("models/" + filename, "w") as f:
+    filename = "ucf_train_oneshot_1frame_img_se" + str(year) + '_' + str(month) + '_' + str(day) + ".txt"
+    with open("../model/" + filename, "w") as f:
 
         for episode in range(EPISODE):
 
@@ -193,17 +207,15 @@ def main():
             batches,batch_labels = batch_dataloader.__iter__().next()
             sample_features = feature_encoder(Variable(samples).cuda(GPU))
             batch_features = feature_encoder(Variable(batches).cuda(GPU))
-            # calculate relations   each batch sample link to every samples to calculate relations
+            # calculate relations
+            # each batch sample link to every samples to calculate relations
             # to form a 100x128 matrix for relation network
-            # print(sample_features.shape)[5,64,1,19,19]
-            sample_features_ext = sample_features.unsqueeze(0).repeat(BATCH_NUM_PER_CLASS*CLASS_NUM,1,1,1,1,1)
-            sample_features_ext = torch.squeeze(sample_features_ext)
-            # print(sample_features_ext.shape) 75,5,64,1,19,19
-            batch_features_ext = batch_features.unsqueeze(0).repeat(SAMPLE_NUM_PER_CLASS*CLASS_NUM,1,1,1,1,1)
-            # print(batch_features_ext.shape) [5, 75, 64, 1, 19, 19]
+            sample_features_ext = sample_features.unsqueeze(0).repeat(BATCH_NUM_PER_CLASS*CLASS_NUM,1,1,1,1)
+            #torch.Size([75, 5, 64, 19, 19])
+            batch_features_ext = batch_features.unsqueeze(0).repeat(SAMPLE_NUM_PER_CLASS*CLASS_NUM,1,1,1,1)
+            #5 75 64 19 19
             batch_features_ext = torch.transpose(batch_features_ext,0,1)
-            # print(batch_features_ext.shape) 75 5 64 1 19 19
-            batch_features_ext = torch.squeeze(batch_features_ext)
+            #75 5 64 19 19
             relation_pairs = torch.cat((sample_features_ext,batch_features_ext),2).view(-1,FEATURE_DIM*2,19,19)
             #print(relation_pairs.shape)
             relations = relation_network(relation_pairs).view(-1,CLASS_NUM*SAMPLE_NUM_PER_CLASS)
@@ -253,11 +265,9 @@ def main():
                         # calculate relations
                         # each batch sample link to every samples to calculate relations
                         # to form a 100x128 matrix for relation network
-                        sample_features_ext = sample_features.unsqueeze(0).repeat(batch_size,1,1,1,1,1)
-                        sample_features_ext = torch.squeeze(sample_features_ext)
-                        test_features_ext = test_features.unsqueeze(0).repeat(1*CLASS_NUM,1,1,1,1,1)
+                        sample_features_ext = sample_features.unsqueeze(0).repeat(batch_size,1,1,1,1)
+                        test_features_ext = test_features.unsqueeze(0).repeat(1*CLASS_NUM,1,1,1,1)
                         test_features_ext = torch.transpose(test_features_ext,0,1)
-                        test_features_ext = torch.squeeze(test_features_ext)
                         relation_pairs = torch.cat((sample_features_ext,test_features_ext),2).view(-1,FEATURE_DIM*2,19,19)
                         relations = relation_network(relation_pairs).view(-1,CLASS_NUM)
 
@@ -279,8 +289,8 @@ def main():
                 if test_accuracy > last_accuracy:
 
                     # save networks
-                    torch.save(feature_encoder.state_dict(),str("./model/ucf_feature_encoder_c3d_16frame" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl"))
-                    torch.save(relation_network.state_dict(),str("./model/ucf_relation_network_c3d_16frame"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl"))
+                    torch.save(feature_encoder.state_dict(),str("../model/ucf_feature_encoder_1frame_img_se" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl"))
+                    torch.save(relation_network.state_dict(),str("../model/ucf_relation_network_1frame_img_se"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl"))
 
                     print("save networks for episode:",episode)
 

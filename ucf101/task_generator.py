@@ -83,6 +83,7 @@ class Ucf101Task(object):
             # 从每类一堆视频中选3个视频 一共选出了15个文件 5way 1shot
         for c in class_ucf_support_folders:
             temp = [os.path.join(c, x) for x in os.listdir(c)]
+            temp.sort()#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1
             samples=temp[len(temp)//2]
             #取中间的帧作为输入
             self.train_labels.append(labels[self.get_class(samples)])
@@ -90,6 +91,7 @@ class Ucf101Task(object):
 
         for c in class_ucf_query_folders:
             temp = [os.path.join(c, x) for x in os.listdir(c)]
+            temp.sort()
             samples = temp[len(temp) // 2]
             self.test_labels.append(labels[self.get_class(samples)])
             self.test_roots.append(samples)

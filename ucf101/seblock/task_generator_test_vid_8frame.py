@@ -91,7 +91,8 @@ class Ucf101Task(object):
 
         for c in class_ucf_query_folders:
             temp = [os.path.join(c, x) for x in os.listdir(c)]
-            samples=temp[1:len(temp):len(temp)//8]
+            temp.sort()
+            samples=temp[0:len(temp):len(temp)//8]
             samples = samples[:8]
             self.test_labels.append(labels[self.get_class(samples[0])])
             self.test_roots.append(samples)
