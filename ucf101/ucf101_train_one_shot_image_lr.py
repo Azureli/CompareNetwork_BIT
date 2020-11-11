@@ -54,23 +54,6 @@ def mean_confidence_interval(data, confidence=0.95):
     h = se * sp.stats.t._ppf((1+confidence)/2., n-1)
     return m,h
 
-class SELayer(nn.Module):
-    def __init__(self, channel, reduction=16):
-        super(SELayer, self).__init__()
-        self.avg_pool = nn.AdaptiveAvgPool2d(1)
-        self.fc = nn.Sequential(
-            nn.Linear(channel, channel // reduction, bias=False),
-            nn.ReLU(inplace=True),
-            nn.Linear(channel // reduction, channel, bias=False),
-            nn.Sigmoid()
-        )
-
-    def forward(self, x):
-        b, c, _, _,= x.size()
-        #batch c 1 h w
-        y = self.avg_pool(x).view(b, c)
-        y = self.fc(y).view(b, c,  1, 1)
-        return x * y.expand_as(x)
 class CNNEncoder(nn.Module):
     """docstring for ClassName"""
     def __init__(self):
@@ -93,14 +76,12 @@ class CNNEncoder(nn.Module):
                         nn.Conv2d(64,64,kernel_size=3,padding=1),
                         nn.BatchNorm2d(64, momentum=1, affine=True),
                         nn.ReLU())
-        self.se = self.se = SELayer(64, 16)
 
     def forward(self,x):
         out = self.layer1(x)
         out = self.layer2(out)
         out = self.layer3(out)
         out = self.layer4(out)
-        out = self.se(out)
         #out = out.view(out.size(0),-1)
         return out # 64
 
@@ -142,8 +123,7 @@ def weights_init(m):
     elif classname.find('Linear') != -1:
         n = m.weight.size(1)
         m.weight.data.normal_(0, 0.01)
-        if m.bias is not None:
-            m.bias.data = torch.ones(m.bias.data.size())
+        m.bias.data = torch.ones(m.bias.data.size())
 
 def main():
     # Step 1: init data folders
@@ -167,15 +147,15 @@ def main():
     relation_network.cuda(GPU)
 
     feature_encoder_optim = torch.optim.Adam(feature_encoder.parameters(),lr=LEARNING_RATE)
-    feature_encoder_scheduler = StepLR(feature_encoder_optim,step_size=100000,gamma=0.5)
+    feature_encoder_scheduler = StepLR(feature_encoder_optim,step_size=10000,gamma=0.5)
     relation_network_optim = torch.optim.Adam(relation_network.parameters(),lr=LEARNING_RATE)
-    relation_network_scheduler = StepLR(relation_network_optim,step_size=100000,gamma=0.5)
+    relation_network_scheduler = StepLR(relation_network_optim,step_size=10000,gamma=0.5)
 
-    if os.path.exists(str("../model/ucf_feature_encoder_1frame_img_se" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")):
-        feature_encoder.load_state_dict(torch.load(str("../model/ucf_feature_encoder_1frame_img_se" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")))
+    if os.path.exists(str("./model/ucf_feature_encoder_1frame_img_lr" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")):
+        feature_encoder.load_state_dict(torch.load(str("./model/ucf_feature_encoder_1frame_img_lr" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")))
         print("load feature encoder success")
-    if os.path.exists(str("../model/ucf_relation_network_1frame_img_se"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")):
-        relation_network.load_state_dict(torch.load(str("../model/ucf_relation_network_1frame_img_se"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")))
+    if os.path.exists(str("./model/ucf_relation_network_1frame_img_lr"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")):
+        relation_network.load_state_dict(torch.load(str("./model/ucf_relation_network_1frame_img_lr"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")))
         print("load relation network success")
 
     # Step 3: build graph
@@ -186,8 +166,8 @@ def main():
     year = datetime.datetime.now().year
     month = datetime.datetime.now().month
     day = datetime.datetime.now().day
-    filename = "ucf_train_oneshot_1frame_img_se" + str(year) + '_' + str(month) + '_' + str(day) + ".txt"
-    with open("../model/" + filename, "w") as f:
+    filename = "ucf_train_oneshot_1frame_img" + str(year) + '_' + str(month) + '_' + str(day) + ".txt"
+    with open("model/" + filename, "w") as f:
 
         for episode in range(EPISODE):
 
@@ -289,8 +269,8 @@ def main():
                 if test_accuracy > last_accuracy:
 
                     # save networks
-                    torch.save(feature_encoder.state_dict(),str("../model/ucf_feature_encoder_1frame_img_se" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl"))
-                    torch.save(relation_network.state_dict(),str("../model/ucf_relation_network_1frame_img_se"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl"))
+                    torch.save(feature_encoder.state_dict(),str("./model/ucf_feature_encoder_1frame_img_lr" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl"))
+                    torch.save(relation_network.state_dict(),str("./model/ucf_relation_network_1frame_img_lr"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl"))
 
                     print("save networks for episode:",episode)
 
