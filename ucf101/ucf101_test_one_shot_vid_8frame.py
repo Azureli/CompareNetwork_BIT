@@ -150,6 +150,9 @@ def main():
     feature_encoder.cuda(GPU)
     relation_network.cuda(GPU)
 
+    class_time=[0]*101
+    class_right=[0]*101
+    class_acc=[0.0]*101
 
     if os.path.exists(str("./model/ucf_feature_encoder_c3d_8frame" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")):
         feature_encoder.load_state_dict(torch.load(str("./model/ucf_feature_encoder_c3d_8frame" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl")))
@@ -204,7 +207,9 @@ def main():
                     _,predict_labels = torch.max(relations.data,1)
 
                     rewards = [1 if predict_labels[j].cuda()==test_labels[j].cuda() else 0 for j in range(batch_size)]
-
+                    for i in range(batch_size):
+                        class_time[test_labels[j]] = class_time[test_labels[j]] +1
+                        class_right[predict_labels[j]] = class_right[predict_labels[j]]+1
                     total_rewards += np.sum(rewards)
                     counter += batch_size
                 accuracy = total_rewards/1.0/counter
@@ -217,6 +222,10 @@ def main():
             total_accuracy += test_accuracy
 
     print("aver_accuracy:",total_accuracy/EPISODE)
+    for i in range(101):
+        class_acc=class_right[i]/class_time[i]
+
+    print("")
 
 
 

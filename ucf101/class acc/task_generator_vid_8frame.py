@@ -11,6 +11,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from torch.utils.data.sampler import Sampler
 
+
+############one shot
 def imshow(img):
     npimg = img.numpy()
     plt.axis("off")
@@ -19,14 +21,14 @@ def imshow(img):
 
 class Rotate(object):
     def __init__(self, angle):
-        self.angle = 90
+        self.angle = angle
     def __call__(self, x, mode="reflect"):
         x = x.rotate(self.angle)
         return x
 
 def ucf101_folders():
-    train_folder = '../datas/ucf_data/trainsplit1'
-    test_folder = '../datas/ucf_data/valsplit1'
+    train_folder = '../../datas/ucf_data/trainsplit1'
+    test_folder = '../../datas/ucf_data/valsplit1'
 
     metatrain_folders = [os.path.join(train_folder, label) \
                 for label in os.listdir(train_folder) \
@@ -46,12 +48,13 @@ def ucf101_folders():
 class Ucf101Task(object):
 
     def __init__(self, character_folders, num_classes, train_num,test_num):
+
         self.character_folders = character_folders
         self.num_classes = num_classes
         self.train_num = train_num
         self.test_num = test_num
-
         class_folders = random.sample(self.character_folders,self.num_classes)
+        #五个类别文件夹
         labels = np.array(range(len(class_folders)))
         labels = dict(zip(class_folders, labels))
         samples = dict()
@@ -68,11 +71,9 @@ class Ucf101Task(object):
             #c apply
             filelist = os.listdir(c)
             #file list apply/fefew/
-            train_file=random.sample(filelist,train_num)
-            for d in train_file:
-                class_ucf_support_folders.append(os.path.join(c,d))
-            #从每类一堆视频中选一个视频 一共选出了五个文件 5way 1shot
+            class_ucf_support_folders.append(os.path.join(c,random.sample(filelist,train_num)[0]))
 
+            #从每类一堆视频中选一个视频 一共选出了五个文件 5way 1shot
         for c in class_folders:
             filelist = os.listdir(c)
             filelist=random.sample(filelist, test_num)
@@ -91,13 +92,15 @@ class Ucf101Task(object):
 
         for c in class_ucf_query_folders:
             temp = [os.path.join(c, x) for x in os.listdir(c)]
-            samples=temp[1:len(temp):len(temp)//8]
+            temp.sort()
+            samples=temp[0:len(temp):len(temp)//8]
             samples = samples[:8]
             self.test_labels.append(labels[self.get_class(samples[0])])
             self.test_roots.append(samples)
 
     def get_class(self, sample):
         return os.path.join(*sample.split('/')[:-2])
+
 
 class FewShotDataset(Dataset):
 
@@ -140,34 +143,6 @@ class ClassBalancedSampler(Sampler):
     ''' Samples 'num_inst' examples each from 'num_cl' pools
         of examples of size 'num_per_class' '''
 
-    def __init__(self, num_cl, num_inst,shuffle=True):
-
-        self.num_cl = num_cl
-        self.num_inst = num_inst
-        self.shuffle = shuffle
-
-    def __iter__(self):
-        # return a single list of indices, assuming that items will be grouped by class
-        if self.shuffle:
-            batches = [[i+j*self.num_inst for i in torch.randperm(self.num_inst)] for j in range(self.num_cl)]
-        else:
-            batches = [[i+j*self.num_inst for i in range(self.num_inst)] for j in range(self.num_cl)]
-        batches = [[batches[j][i] for j in range(self.num_cl)] for i in range(self.num_inst)]
-
-        if self.shuffle:
-            random.shuffle(batches)
-            for sublist in batches:
-                   random.shuffle(sublist)
-        batches = [item for sublist in batches for item in sublist]
-        return iter(batches)
-
-    def __len__(self):
-        return 1
-
-class ClassBalancedSamplerOld(Sampler):
-    ''' Samples 'num_inst' examples each from 'num_cl' pools
-        of examples of size 'num_per_class' '''
-
     def __init__(self, num_per_class, num_cl, num_inst,shuffle=True):
         self.num_per_class = num_per_class
         self.num_cl = num_cl
@@ -192,13 +167,14 @@ class ClassBalancedSamplerOld(Sampler):
 
 def get_ucf101_data_loader(task, num_per_class=1, split='train',shuffle = False):
     normalize = transforms.Normalize(mean=[0.92206, 0.92206, 0.92206], std=[0.08426, 0.08426, 0.08426])
-
     dataset = Ucf101(task,split=split,transform=transforms.Compose([transforms.ToTensor(),normalize]))
-    if split == 'train':
-        sampler = ClassBalancedSamplerOld(num_per_class,task.num_classes, task.train_num,shuffle=shuffle)
 
+    if split == 'train':
+        sampler = ClassBalancedSampler(num_per_class, task.num_classes, task.train_num,shuffle=shuffle)
     else:
-        sampler = ClassBalancedSampler(task.num_classes, task.test_num,shuffle=shuffle)
+        sampler = ClassBalancedSampler(num_per_class, task.num_classes, task.test_num,shuffle=shuffle)
 
     loader = DataLoader(dataset, batch_size=num_per_class*task.num_classes, sampler=sampler)
+
     return loader
+

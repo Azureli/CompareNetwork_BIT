@@ -185,11 +185,16 @@ def main():
             # sample datas
             samples,sample_labels = sample_dataloader.__iter__().next()
             batches,batch_labels = batch_dataloader.__iter__().next()
+            # print(samples.shape)
+            #[75,3,84,84]
+            # print(batches.shape)
             # calculate features
             sample_features = feature_encoder(Variable(samples).cuda(GPU))
-            # print(sample_features.shape)            torch.Size([5, 15, 64, 19, 19])
+            # print(sample_features.shape)
+            # torch.Size([5, 64, 19, 19])
             batch_features = feature_encoder(Variable(batches).cuda(GPU))
-            # print(batch_features.shape)  torch.Size([15, 5, 64, 19, 19])
+            # print(batch_features.shape)
+            # torch.Size([75, 64, 19, 19])
             # calculate relations
             # each batch sample link to every samples to calculate relations
             # to form a 100x128 matrix for relation network
@@ -200,9 +205,10 @@ def main():
             batch_features_ext = torch.transpose(batch_features_ext,0,1)
             #75 5 64 19 19
             relation_pairs = torch.cat((sample_features_ext,batch_features_ext),2).view(-1,FEATURE_DIM*2,19,19)
-            #print(relation_pairs.shape)
+            # print(relation_pairs.shape)
+            #375,128,19,19
             relations = relation_network(relation_pairs).view(-1,CLASS_NUM*SAMPLE_NUM_PER_CLASS)
-            #print(relations.shape)
+            print(relations.shape)
             mse = nn.MSELoss().cuda(GPU)
             one_hot_labels = Variable(torch.zeros(BATCH_NUM_PER_CLASS*CLASS_NUM, CLASS_NUM).scatter_(1, batch_labels.view(-1,1), 1)).cuda(GPU)
             loss = mse(relations,one_hot_labels)
@@ -274,8 +280,8 @@ def main():
                 if test_accuracy > last_accuracy:
 
                     # save networks
-                    torch.save(feature_encoder.state_dict(),str("./models/miniimagenet_feature_encoder2" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl"))
-                    torch.save(relation_network.state_dict(),str("./models/miniimagenet_relation_network2"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl"))
+                    # torch.save(feature_encoder.state_dict(),str("./models/miniimagenet_feature_encoder2" + str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl"))
+                    # torch.save(relation_network.state_dict(),str("./models/miniimagenet_relation_network2"+ str(CLASS_NUM) +"way_" + str(SAMPLE_NUM_PER_CLASS) +"shot.pkl"))
 
                     print("save networks for episode:",episode)
 
